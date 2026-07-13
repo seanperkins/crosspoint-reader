@@ -74,12 +74,21 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
   return false;
 }
 
+void MappedInputManager::update() const { gpio.update(SETTINGS.doublePwrBtnBack); }
+
+bool MappedInputManager::wasPowerSingleClicked() const {
+  return SETTINGS.doublePwrBtnBack ? gpio.wasPowerSingleClicked() : mapButton(Button::Power, &HalGPIO::wasReleased);
+}
+
 bool MappedInputManager::wasPressed(const Button button) const {
   const bool mappedButtonPressed = mapButton(button, &HalGPIO::wasPressed);
   if (button == Button::Confirm && SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::CONFIRM) {
     // A short Power action is known only on release. Report a complete Confirm click in this frame so
     // activities that handle either edge work, while a held Power button retains its sleep behavior.
-    return mappedButtonPressed || mapButton(Button::Power, &HalGPIO::wasReleased);
+    return mappedButtonPressed || wasPowerSingleClicked();
+  }
+  if (button == Button::Back && SETTINGS.doublePwrBtnBack) {
+    return mappedButtonPressed || gpio.wasPowerDoubleClicked();
   }
   return mappedButtonPressed;
 }
@@ -87,7 +96,10 @@ bool MappedInputManager::wasPressed(const Button button) const {
 bool MappedInputManager::wasReleased(const Button button) const {
   const bool mappedButtonReleased = mapButton(button, &HalGPIO::wasReleased);
   if (button == Button::Confirm && SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::CONFIRM) {
-    return mappedButtonReleased || mapButton(Button::Power, &HalGPIO::wasReleased);
+    return mappedButtonReleased || wasPowerSingleClicked();
+  }
+  if (button == Button::Back && SETTINGS.doublePwrBtnBack) {
+    return mappedButtonReleased || gpio.wasPowerDoubleClicked();
   }
   return mappedButtonReleased;
 }

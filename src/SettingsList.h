@@ -180,6 +180,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH, StrId::STR_FOOTNOTES,
              StrId::STR_CONFIRM},
             "shortPwrBtn", StrId::STR_CAT_CONTROLS),
+        SettingInfo::Toggle(StrId::STR_DOUBLE_PWR_BTN_BACK, &CrossPointSettings::doublePwrBtnBack, "doublePwrBtnBack",
+                            StrId::STR_CAT_CONTROLS),
         SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &CrossPointSettings::pwrBtnFootnoteBack,
                             "pwrBtnFootnoteBack", StrId::STR_CAT_CONTROLS),
 

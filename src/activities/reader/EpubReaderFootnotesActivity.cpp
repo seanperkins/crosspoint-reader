@@ -27,7 +27,8 @@ void EpubReaderFootnotesActivity::loop() {
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
-      mappedInput.wasReleased(MappedInputManager::Button::Power)) {
+      (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::FOOTNOTES &&
+       mappedInput.wasPowerSingleClicked())) {
     if (selectedIndex >= 0 && selectedIndex < static_cast<int>(footnotes.size())) {
       setResult(FootnoteResult{footnotes[selectedIndex].href});
       finish();

@@ -45,6 +45,13 @@ class HalGPIO {
 
   bool lastUsbConnected = false;
   bool usbStateChanged = false;
+  bool pendingPowerClick = false;
+  bool powerSingleClick = false;
+  bool powerDoubleClick = false;
+  bool powerScreenshotChordActive = false;
+  unsigned long pendingPowerReleaseTime = 0;
+
+  static constexpr unsigned long POWER_DOUBLE_CLICK_MS = 300;
 
  public:
   enum class DeviceType : uint8_t { X4, X3 };
@@ -63,7 +70,7 @@ class HalGPIO {
   void begin();
 
   // Button input methods
-  void update();
+  void update(bool powerDoubleClickEnabled = false);
   bool isPressed(uint8_t buttonIndex) const;
   bool wasPressed(uint8_t buttonIndex) const;
   bool wasAnyPressed() const;
@@ -71,6 +78,8 @@ class HalGPIO {
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
   unsigned long getPowerButtonHeldTime() const;
+  bool wasPowerSingleClicked() const;
+  bool wasPowerDoubleClicked() const;
 
   // Setup wake up GPIO and enter deep sleep
   void startDeepSleep();

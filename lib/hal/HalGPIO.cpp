@@ -202,11 +202,49 @@ void HalGPIO::begin() {
   }
 }
 
-void HalGPIO::update() {
+void HalGPIO::update(const bool powerDoubleClickEnabled) {
   inputMgr.update();
   const bool connected = isUsbConnected();
   usbStateChanged = (connected != lastUsbConnected);
   lastUsbConnected = connected;
+
+  powerSingleClick = false;
+  powerDoubleClick = false;
+  if (!powerDoubleClickEnabled) {
+    pendingPowerClick = false;
+    powerScreenshotChordActive = false;
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (inputMgr.isPressed(BTN_POWER) && inputMgr.isPressed(BTN_DOWN)) {
+    powerScreenshotChordActive = true;
+    pendingPowerClick = false;
+  }
+  if (pendingPowerClick && now - pendingPowerReleaseTime > POWER_DOUBLE_CLICK_MS) {
+    pendingPowerClick = false;
+    powerSingleClick = true;
+  }
+
+  if (!inputMgr.wasReleased(BTN_POWER)) {
+    return;
+  }
+
+  // Power + Down is the screenshot chord. Do not turn either release order into a click.
+  if (powerScreenshotChordActive || inputMgr.isPressed(BTN_DOWN) || inputMgr.wasReleased(BTN_DOWN)) {
+    pendingPowerClick = false;
+    powerSingleClick = false;
+    powerScreenshotChordActive = false;
+    return;
+  }
+
+  if (pendingPowerClick && now - pendingPowerReleaseTime <= POWER_DOUBLE_CLICK_MS) {
+    pendingPowerClick = false;
+    powerDoubleClick = true;
+  } else {
+    pendingPowerClick = true;
+    pendingPowerReleaseTime = now;
+  }
 }
 
 bool HalGPIO::wasUsbStateChanged() const { return usbStateChanged; }
@@ -224,6 +262,10 @@ bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased(); }
 unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
 
 unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPowerButtonHeldTime(); }
+
+bool HalGPIO::wasPowerSingleClicked() const { return powerSingleClick; }
+
+bool HalGPIO::wasPowerDoubleClicked() const { return powerDoubleClick; }
 
 void HalGPIO::startDeepSleep() {
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
