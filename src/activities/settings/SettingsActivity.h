@@ -170,6 +170,7 @@ class SettingsActivity final : public Activity {
   void openSleepTimeoutPicker();
   void rebuildSettingsLists();
   void syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChanged, bool quickResumeTimeoutChanged);
+  void syncPowerButtonSettings(uint8_t CrossPointSettings::* changedSetting);
 
  public:
   explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

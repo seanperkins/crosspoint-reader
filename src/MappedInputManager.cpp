@@ -74,11 +74,13 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
   return false;
 }
 
-void MappedInputManager::update() const { gpio.update(SETTINGS.doublePwrBtnBack); }
-
-bool MappedInputManager::wasPowerSingleClicked() const {
-  return SETTINGS.doublePwrBtnBack ? gpio.wasPowerSingleClicked() : mapButton(Button::Power, &HalGPIO::wasReleased);
+void MappedInputManager::update() const {
+  const bool doubleClickEnabled =
+      SETTINGS.doublePwrBtnBack && SETTINGS.shortPwrBtn != CrossPointSettings::SHORT_PWRBTN::SLEEP;
+  gpio.update(doubleClickEnabled);
 }
+
+bool MappedInputManager::wasPowerSingleClicked() const { return gpio.wasPowerSingleClicked(); }
 
 bool MappedInputManager::wasPressed(const Button button) const {
   const bool mappedButtonPressed = mapButton(button, &HalGPIO::wasPressed);
