@@ -210,6 +210,7 @@ void SettingsActivity::toggleCurrentSetting() {
       optionPopup.show(setting.nameId, setting.enumValues.data(), static_cast<int>(setting.enumValues.size()),
                        currentValue, [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged](int idx) {
                          SETTINGS.*valuePtr = idx;
+                         syncPowerButtonSettings(valuePtr);
                          syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
                          SETTINGS.saveToFile();
                          rebuildSettingsLists();
@@ -304,10 +305,21 @@ void SettingsActivity::toggleCurrentSetting() {
     return;
   }
 
+  syncPowerButtonSettings(setting.valuePtr);
   syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
   SETTINGS.saveToFile();
   rebuildSettingsLists();
   selectedSettingIndex = std::min(selectedSettingIndex, settingsCount);
+}
+
+void SettingsActivity::syncPowerButtonSettings(uint8_t CrossPointSettings::* changedSetting) {
+  if (changedSetting == &CrossPointSettings::shortPwrBtn &&
+      SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP) {
+    SETTINGS.doublePwrBtnBack = 0;
+  } else if (changedSetting == &CrossPointSettings::doublePwrBtnBack && SETTINGS.doublePwrBtnBack &&
+             SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP) {
+    SETTINGS.shortPwrBtn = CrossPointSettings::SHORT_PWRBTN::IGNORE;
+  }
 }
 
 void SettingsActivity::syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChanged, bool quickResumeTimeoutChanged) {

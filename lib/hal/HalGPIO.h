@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <InputManager.h>
 
+#include "PowerButtonGesture.h"
+
 // Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
 #define EPD_SCLK 8   // SPI Clock
 #define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
@@ -45,6 +47,7 @@ class HalGPIO {
 
   bool lastUsbConnected = false;
   bool usbStateChanged = false;
+  PowerButtonGesture powerButtonGesture;
 
  public:
   enum class DeviceType : uint8_t { X4, X3 };
@@ -63,7 +66,7 @@ class HalGPIO {
   void begin();
 
   // Button input methods
-  void update();
+  void update(bool powerDoubleClickEnabled = false);
   bool isPressed(uint8_t buttonIndex) const;
   bool wasPressed(uint8_t buttonIndex) const;
   bool wasAnyPressed() const;
@@ -71,6 +74,8 @@ class HalGPIO {
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
   unsigned long getPowerButtonHeldTime() const;
+  bool wasPowerSingleClicked() const;
+  bool wasPowerDoubleClicked() const;
 
   // Setup wake up GPIO and enter deep sleep
   void startDeepSleep();

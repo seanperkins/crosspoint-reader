@@ -202,11 +202,14 @@ void HalGPIO::begin() {
   }
 }
 
-void HalGPIO::update() {
+void HalGPIO::update(const bool powerDoubleClickEnabled) {
   inputMgr.update();
   const bool connected = isUsbConnected();
   usbStateChanged = (connected != lastUsbConnected);
   lastUsbConnected = connected;
+  powerButtonGesture.update(powerDoubleClickEnabled, millis(), inputMgr.isPressed(BTN_POWER),
+                            inputMgr.isPressed(BTN_DOWN), inputMgr.wasReleased(BTN_POWER),
+                            inputMgr.wasReleased(BTN_DOWN));
 }
 
 bool HalGPIO::wasUsbStateChanged() const { return usbStateChanged; }
@@ -224,6 +227,10 @@ bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased(); }
 unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
 
 unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPowerButtonHeldTime(); }
+
+bool HalGPIO::wasPowerSingleClicked() const { return powerButtonGesture.wasSingleClicked(); }
+
+bool HalGPIO::wasPowerDoubleClicked() const { return powerButtonGesture.wasDoubleClicked(); }
 
 void HalGPIO::startDeepSleep() {
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
