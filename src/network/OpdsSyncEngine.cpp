@@ -19,7 +19,15 @@ OpdsSyncStats OpdsSyncEngine::run(const std::string& startUrl) {
     queue.pop_front();
 
     if (depth > MAX_DEPTH) continue;
-    if (!visited.insert(url).second) continue;  // already walked this feed URL
+    if (visited.count(url) > 0) continue;  // already walked this feed URL
+    if (visited.size() >= maxVisitedFeeds) {
+      // Cap reached: stop gracefully rather than growing `visited` (and the
+      // queue) without bound, which risks abort() on OOM under
+      // -fno-exceptions.
+      stats.limitReached = true;
+      return stats;
+    }
+    visited.insert(url);
 
     std::vector<OpdsSyncEntry> entries;
     std::string nextPageUrl;

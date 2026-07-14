@@ -51,7 +51,11 @@ class OpdsBookBrowserActivity final : public Activity, public OpdsSyncObserver {
   size_t downloadProgress = 0;
   size_t downloadTotal = 0;
   OpdsSyncStats syncStats;
-  std::string syncCurrentTitle;
+  // Fixed buffer, not std::string: the render task reads this via .c_str()
+  // under RenderLock while the main task reassigns it in onBeforeDownload
+  // without a lock. A std::string reassignment can free/realloc concurrently
+  // with that read; a char[] write races only into a benign torn read.
+  char syncCurrentTitle[128];
 
   OpdsServer server;  // Copied at construction — safe even if the store changes during browsing
 

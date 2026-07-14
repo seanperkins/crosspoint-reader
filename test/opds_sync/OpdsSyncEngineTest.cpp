@@ -232,3 +232,40 @@ TEST(OpdsSyncEngine, StopsOnFeedFetchFailure) {
   EXPECT_EQ(stats.added, 0);
   EXPECT_EQ(stats.failed, 0);
 }
+
+namespace {
+
+// Backend where every fetchFeed synthesizes a brand-new navigation child
+// (a bottomless catalog: feed1 -> feed2 -> feed3 -> ...). Deterministic
+// (counter-derived URLs, no randomness). Without the visited-feed cap this
+// walk never terminates; it exists to prove the cap stops it gracefully.
+class UnboundedBackend : public OpdsSyncBackend {
+ public:
+  int fetchCount = 0;
+  bool fetchFeed(const std::string&, std::vector<OpdsSyncEntry>& out, std::string& next) override {
+    fetchCount++;
+    out = {nav("Next", "http://s/feed" + std::to_string(fetchCount))};
+    next = "";
+    return true;
+  }
+  bool exists(const std::string&) override { return false; }
+  OpdsDownloadOutcome download(const std::string&, const std::string&) override {
+    return OpdsDownloadOutcome::Ok;
+  }
+};
+
+}  // namespace
+
+TEST(OpdsSyncEngine, StopsAtVisitedFeedCapOnUnboundedCatalog) {
+  UnboundedBackend be;
+  FakeObserver ob;
+  OpdsSyncEngine engine(be, ob, /*maxVisitedFeeds=*/3);
+  auto stats = engine.run("http://s/opds");
+
+  // The walk must terminate (the test itself would hang otherwise) and
+  // report that it stopped early rather than exhausting the (infinite) feed.
+  EXPECT_TRUE(stats.limitReached);
+  // Exactly `maxVisitedFeeds` feeds get inserted into `visited` and fetched;
+  // the feed that would be the (maxVisitedFeeds+1)th is never fetched.
+  EXPECT_EQ(be.fetchCount, 3);
+}

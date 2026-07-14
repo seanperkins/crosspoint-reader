@@ -23,6 +23,10 @@ bool OpdsSyncBackendDevice::fetchFeed(const std::string& url, std::vector<OpdsSy
     return false;
   }
 
+  if (parser.truncated()) {
+    LOG_ERR("OPDSSYNC", "Feed truncated, some books may be skipped: %s", url.c_str());
+  }
+
   outNextPageUrl = parser.getNextPageUrl();
   const auto& entries = parser.getEntries();
   outEntries.reserve(entries.size());

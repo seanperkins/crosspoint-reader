@@ -21,6 +21,7 @@ struct OpdsSyncStats {
   int added = 0;
   int skipped = 0;
   int failed = 0;
+  bool limitReached = false;  // true if the walk stopped early due to the visited-feed cap
 };
 
 struct OpdsSyncProgress {
@@ -57,17 +58,25 @@ class OpdsSyncObserver {
 class OpdsSyncEngine {
  public:
   static constexpr int MAX_DEPTH = 8;
+  // Defensive cap on the cycle-guard `visited` set. Without this, a huge
+  // recursive catalog could grow `visited` unboundedly; on this platform
+  // (-fno-exceptions) an allocation failure calls abort() rather than
+  // throwing, so we stop the walk gracefully well before that's a risk.
+  static constexpr size_t DEFAULT_MAX_VISITED_FEEDS = 4000;
 
-  OpdsSyncEngine(OpdsSyncBackend& backend, OpdsSyncObserver& observer)
-      : backend(backend), observer(observer) {}
+  OpdsSyncEngine(OpdsSyncBackend& backend, OpdsSyncObserver& observer,
+                 size_t maxVisitedFeeds = DEFAULT_MAX_VISITED_FEEDS)
+      : backend(backend), observer(observer), maxVisitedFeeds(maxVisitedFeeds) {}
 
   // Walk from absolute `startUrl`, recursing into navigation sub-catalogs
   // (BFS, cycle-guarded, depth-capped) and following pagination. Returns
-  // aggregate stats; returns partial stats early if a feed fetch fails or the
-  // observer cancels.
+  // aggregate stats; returns partial stats early if a feed fetch fails, the
+  // observer cancels, or the visited-feed cap is reached
+  // (stats.limitReached == true).
   OpdsSyncStats run(const std::string& startUrl);
 
  private:
   OpdsSyncBackend& backend;
   OpdsSyncObserver& observer;
+  size_t maxVisitedFeeds;
 };

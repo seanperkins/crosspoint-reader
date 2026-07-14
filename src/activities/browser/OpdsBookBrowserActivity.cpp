@@ -183,8 +183,8 @@ void OpdsBookBrowserActivity::render(RenderLock&&) {
     char counts[48];
     snprintf(counts, sizeof(counts), tr(STR_SYNC_SUMMARY_FMT), syncStats.added, syncStats.skipped, syncStats.failed);
     renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 10, counts);
-    if (!syncCurrentTitle.empty()) {
-      auto title = renderer.truncatedText(UI_10_FONT_ID, syncCurrentTitle.c_str(), pageWidth - 40);
+    if (syncCurrentTitle[0] != '\0') {
+      auto title = renderer.truncatedText(UI_10_FONT_ID, syncCurrentTitle, pageWidth - 40);
       renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 20, title.c_str());
     }
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
@@ -355,7 +355,7 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
 void OpdsBookBrowserActivity::startSync() {
   state = BrowserState::SYNCING;
   syncStats = OpdsSyncStats{};
-  syncCurrentTitle.clear();
+  syncCurrentTitle[0] = '\0';
   requestUpdate(true);
 
   const std::string startUrl = UrlUtils::buildUrl(server.url, currentPath);
@@ -363,6 +363,9 @@ void OpdsBookBrowserActivity::startSync() {
   OpdsSyncEngine engine(backend, *this);
   syncStats = engine.run(startUrl);
 
+  if (syncStats.limitReached) {
+    LOG_ERR("OPDSSYNC", "Sync stopped early: visited-feed cap reached; library too large to fully walk");
+  }
   LOG_INF("OPDSSYNC", "Sync done: +%d, skip %d, fail %d", syncStats.added, syncStats.skipped, syncStats.failed);
   state = BrowserState::SYNC_SUMMARY;
   requestUpdate(true);
@@ -370,12 +373,15 @@ void OpdsBookBrowserActivity::startSync() {
 
 bool OpdsBookBrowserActivity::onBeforeDownload(const OpdsSyncProgress& progress) {
   syncStats = progress.stats;
-  syncCurrentTitle = progress.currentTitle;
+  snprintf(syncCurrentTitle, sizeof(syncCurrentTitle), "%s", progress.currentTitle.c_str());
   requestUpdate(true);  // force a synchronous render of the SYNCING screen
 
-  // Poll input so a Back press cancels the sync after the current book.
+  // Poll input so a Back press cancels the sync after the current book. A
+  // press+release can happen entirely mid-download (between polls here), so
+  // wasReleased() would miss it; isPressed() is level-triggered and catches
+  // Back being held down at the moment we sample it.
   mappedInput.update();
-  const bool cancel = mappedInput.wasReleased(MappedInputManager::Button::Back);
+  const bool cancel = mappedInput.isPressed(MappedInputManager::Button::Back);
   delay(1);  // yield to keep the watchdog fed between books
   return !cancel;
 }
