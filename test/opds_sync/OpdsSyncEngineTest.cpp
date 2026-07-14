@@ -274,3 +274,19 @@ TEST(OpdsSyncEngine, StopsAtVisitedFeedCapOnUnboundedCatalog) {
   // the feed that would be the (maxVisitedFeeds+1)th is never fetched.
   EXPECT_EQ(be.fetchCount, 3);
 }
+
+TEST(OpdsSyncEngine, DeduplicatesBookSeenViaMultipleTrees) {
+  // The same book is reachable via two navigation trees (e.g. "By author" and
+  // "By series"). It must be handled once per run, not re-downloaded per tree.
+  FakeBackend be;
+  be.feeds["http://s/opds"] = {{nav("By Author", "authors"), nav("By Series", "series")}, ""};
+  // Both leaf feeds list the SAME book via an absolute download href, so it
+  // resolves to the identical URL from either tree.
+  be.feeds["http://s/opds/authors"] = {{book("A", "1", "http://s/dl/9")}, ""};
+  be.feeds["http://s/opds/series"] = {{book("A", "1", "http://s/dl/9")}, ""};
+  FakeObserver ob;
+  OpdsSyncEngine engine(be, ob);
+  auto stats = engine.run("http://s/opds");
+  EXPECT_EQ(stats.added, 1);          // downloaded once despite two trees
+  EXPECT_EQ(be.downloaded.size(), 1u);
+}
