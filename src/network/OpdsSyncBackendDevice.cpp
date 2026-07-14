@@ -1,5 +1,6 @@
 #include "network/OpdsSyncBackendDevice.h"
 
+#include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Logging.h>
 #include <OpdsParser.h>
@@ -7,6 +8,17 @@
 
 #include "network/HttpDownloader.h"
 #include "util/BookCacheUtils.h"
+
+void opdsEnsureParentDir(const std::string& filePath) {
+  const std::string folder = FsHelpers::extractFolderPath(filePath);
+  // extractFolderPath returns "/" for root-level files — nothing to create.
+  if (folder.empty() || folder == "/" || Storage.exists(folder.c_str())) {
+    return;
+  }
+  if (!Storage.mkdir(folder.c_str())) {
+    LOG_ERR("OPDSSYNC", "Failed to create folder: %s", folder.c_str());
+  }
+}
 
 bool OpdsSyncBackendDevice::fetchFeed(const std::string& url, std::vector<OpdsSyncEntry>& outEntries,
                                       std::string& outNextPageUrl) {
@@ -46,6 +58,7 @@ bool OpdsSyncBackendDevice::exists(const std::string& targetPath) {
 }
 
 OpdsDownloadOutcome OpdsSyncBackendDevice::download(const std::string& url, const std::string& targetPath) {
+  opdsEnsureParentDir(targetPath);
   const auto result = HttpDownloader::downloadToFile(url, targetPath, nullptr, nullptr, server.username, server.password);
   if (result == HttpDownloader::OK) {
     clearBookCache(targetPath);

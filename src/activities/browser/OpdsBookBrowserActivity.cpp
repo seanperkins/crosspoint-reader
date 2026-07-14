@@ -320,6 +320,7 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
   const std::string feedUrl = UrlUtils::buildUrl(server.url, currentPath);
   std::string downloadUrl = UrlUtils::buildUrl(feedUrl, book.href);
   std::string filename = opdsLocalEpubPath(book.author, book.title);
+  opdsEnsureParentDir(filename);
   LOG_DBG("OPDS", "Downloading: %s -> %s", downloadUrl.c_str(), filename.c_str());
 
   int lastRenderedPercent = -1;

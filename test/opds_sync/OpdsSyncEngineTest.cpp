@@ -2,17 +2,22 @@
 
 #include "network/OpdsSyncEngine.h"
 
-TEST(OpdsLocalEpubPath, AuthorAndTitle) {
-  EXPECT_EQ(opdsLocalEpubPath("Jane Doe", "A Book"), "/Jane Doe - A Book.epub");
+TEST(OpdsLocalEpubPath, AuthorFolderThenTitle) {
+  EXPECT_EQ(opdsLocalEpubPath("Jane Doe", "A Book"), "/Jane Doe/A Book.epub");
 }
 
-TEST(OpdsLocalEpubPath, EmptyAuthorOmitsSeparator) {
+TEST(OpdsLocalEpubPath, EmptyAuthorStaysAtRoot) {
   EXPECT_EQ(opdsLocalEpubPath("", "A Book"), "/A Book.epub");
 }
 
-TEST(OpdsLocalEpubPath, SanitizesIllegalChars) {
-  // '/' is illegal in a filename and must be replaced (not left to split paths).
+TEST(OpdsLocalEpubPath, SanitizesTitleIllegalChars) {
+  // '/' is illegal in a filename and must be replaced, not left to split paths.
   EXPECT_EQ(opdsLocalEpubPath("", "a/b"), "/a_b.epub");
+}
+
+TEST(OpdsLocalEpubPath, SanitizesAuthorFolderIllegalChars) {
+  // The author segment is sanitized too, so it can't escape into other folders.
+  EXPECT_EQ(opdsLocalEpubPath("a/b", "T"), "/a_b/T.epub");
 }
 
 #include <algorithm>

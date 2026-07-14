@@ -4,7 +4,14 @@
 #include "util/UrlUtils.h"
 
 std::string opdsLocalEpubPath(const std::string& author, const std::string& title) {
-  return "/" + StringUtils::sanitizeFilename((author.empty() ? "" : author + " - ") + title) + ".epub";
+  // Organize by author: /{Author}/{Title}.epub. Each segment is sanitized
+  // independently so an illegal character (e.g. '/') can't escape its folder.
+  // Books with no author fall back to the SD root so no empty folder is made.
+  const std::string titleFile = StringUtils::sanitizeFilename(title) + ".epub";
+  if (author.empty()) {
+    return "/" + titleFile;
+  }
+  return "/" + StringUtils::sanitizeFilename(author) + "/" + titleFile;
 }
 
 OpdsSyncStats OpdsSyncEngine::run(const std::string& startUrl) {
