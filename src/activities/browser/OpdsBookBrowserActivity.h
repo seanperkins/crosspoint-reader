@@ -7,15 +7,26 @@
 
 #include "OpdsServerStore.h"
 #include "activities/Activity.h"
+#include "network/OpdsSyncEngine.h"
 #include "util/ButtonNavigator.h"
 
 /**
  * Activity for browsing and downloading books from an OPDS server.
  * Supports navigation through catalog hierarchy and downloading EPUBs.
  */
-class OpdsBookBrowserActivity final : public Activity {
+class OpdsBookBrowserActivity final : public Activity, public OpdsSyncObserver {
  public:
-  enum class BrowserState { CHECK_WIFI, WIFI_SELECTION, LOADING, BROWSING, DOWNLOADING, ERROR, SEARCH_INPUT };
+  enum class BrowserState {
+    CHECK_WIFI,
+    WIFI_SELECTION,
+    LOADING,
+    BROWSING,
+    DOWNLOADING,
+    ERROR,
+    SEARCH_INPUT,
+    SYNCING,
+    SYNC_SUMMARY
+  };
 
   explicit OpdsBookBrowserActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, OpdsServer server)
       : Activity("OpdsBookBrowser", renderer, mappedInput), buttonNavigator(), server(std::move(server)) {}
@@ -39,6 +50,8 @@ class OpdsBookBrowserActivity final : public Activity {
   std::string statusMessage;
   size_t downloadProgress = 0;
   size_t downloadTotal = 0;
+  OpdsSyncStats syncStats;
+  std::string syncCurrentTitle;
 
   OpdsServer server;  // Copied at construction — safe even if the store changes during browsing
 
@@ -52,5 +65,7 @@ class OpdsBookBrowserActivity final : public Activity {
   void downloadBook(const OpdsEntry& book);
   void launchSearch();
   void performSearch(const std::string& query);
+  void startSync();
+  bool onBeforeDownload(const OpdsSyncProgress& progress) override;
   bool preventAutoSleep() override { return true; }
 };

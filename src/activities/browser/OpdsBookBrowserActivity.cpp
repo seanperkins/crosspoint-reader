@@ -14,6 +14,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "network/HttpDownloader.h"
+#include "network/OpdsSyncBackendDevice.h"
 #include "network/OpdsSyncEngine.h"
 #include "util/BookCacheUtils.h"
 #include "util/UrlUtils.h"
@@ -93,6 +94,17 @@ void OpdsBookBrowserActivity::loop() {
 
   if (state == BrowserState::DOWNLOADING) return;
 
+  if (state == BrowserState::SYNCING) return;  // sync runs synchronously; input handled in onBeforeDownload
+
+  if (state == BrowserState::SYNC_SUMMARY) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
+        mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+      state = BrowserState::BROWSING;
+      requestUpdate();
+    }
+    return;
+  }
+
   if (state == BrowserState::BROWSING) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       if (!entries.empty()) {
@@ -103,6 +115,8 @@ void OpdsBookBrowserActivity::loop() {
       navigateBack();
     } else if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
       if (!searchTemplate.empty() && selectorIndex == 0) launchSearch();
+    } else if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+      startSync();
     }
 
     if (!entries.empty()) {
@@ -164,10 +178,36 @@ void OpdsBookBrowserActivity::render(RenderLock&&) {
     return;
   }
 
+  if (state == BrowserState::SYNCING) {
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 40, tr(STR_SYNC_IN_PROGRESS));
+    char counts[48];
+    snprintf(counts, sizeof(counts), tr(STR_SYNC_SUMMARY_FMT), syncStats.added, syncStats.skipped, syncStats.failed);
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 10, counts);
+    if (!syncCurrentTitle.empty()) {
+      auto title = renderer.truncatedText(UI_10_FONT_ID, syncCurrentTitle.c_str(), pageWidth - 40);
+      renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 20, title.c_str());
+    }
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+    renderer.displayBuffer();
+    return;
+  }
+
+  if (state == BrowserState::SYNC_SUMMARY) {
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 20, tr(STR_SYNC_DONE));
+    char counts[48];
+    snprintf(counts, sizeof(counts), tr(STR_SYNC_SUMMARY_FMT), syncStats.added, syncStats.skipped, syncStats.failed);
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, counts);
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_CONFIRM), "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+    renderer.displayBuffer();
+    return;
+  }
+
   const char* confirmLabel =
       (!entries.empty() && entries[selectorIndex].type == OpdsEntryType::BOOK) ? tr(STR_DOWNLOAD) : tr(STR_OPEN);
   const char* searchLabel = (!searchTemplate.empty() && selectorIndex == 0) ? tr(STR_SEARCH) : tr(STR_DIR_UP);
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, searchLabel, tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, searchLabel, tr(STR_SYNC_ALL));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   if (entries.empty()) {
@@ -310,6 +350,34 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
     errorMessage = tr(STR_DOWNLOAD_FAILED);
   }
   requestUpdate();
+}
+
+void OpdsBookBrowserActivity::startSync() {
+  state = BrowserState::SYNCING;
+  syncStats = OpdsSyncStats{};
+  syncCurrentTitle.clear();
+  requestUpdate(true);
+
+  const std::string startUrl = UrlUtils::buildUrl(server.url, currentPath);
+  OpdsSyncBackendDevice backend(server);
+  OpdsSyncEngine engine(backend, *this);
+  syncStats = engine.run(startUrl);
+
+  LOG_INF("OPDSSYNC", "Sync done: +%d, skip %d, fail %d", syncStats.added, syncStats.skipped, syncStats.failed);
+  state = BrowserState::SYNC_SUMMARY;
+  requestUpdate(true);
+}
+
+bool OpdsBookBrowserActivity::onBeforeDownload(const OpdsSyncProgress& progress) {
+  syncStats = progress.stats;
+  syncCurrentTitle = progress.currentTitle;
+  requestUpdate(true);  // force a synchronous render of the SYNCING screen
+
+  // Poll input so a Back press cancels the sync after the current book.
+  mappedInput.update();
+  const bool cancel = mappedInput.wasReleased(MappedInputManager::Button::Back);
+  delay(1);  // yield to keep the watchdog fed between books
+  return !cancel;
 }
 
 void OpdsBookBrowserActivity::launchSearch() {
